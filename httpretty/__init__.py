@@ -85,6 +85,8 @@ old_ssl_wrap_socket = None
 old_sslwrap_simple = None
 old_sslsocket = None
 
+socket_buffer_size = 16
+
 try:
     import socks
     old_socksocket = socks.socksocket
@@ -249,22 +251,52 @@ class fakesock(object):
             return self.fd
 
         def _true_sendall(self, data, *args, **kw):
-            self.truesock.connect(self._address)
-            self.truesock.sendall(data, *args, **kw)
-
-            _buffer_size = 16
-
-            _d = self.truesock.recv(_buffer_size)
+            
+            sock = self.truesock
+            if self._address[1] == 443 and ssl:
+                sock = old_sslsocket(sock)
+                
+            sock.connect(self._address)
+            sock.sendall(data, *args, **kw)
+            
+            _d = sock.recv(socket_buffer_size)
+            headers = ''
+            
             self.fd.seek(0)
             self.fd.write(_d)
+            headers = headers + _d
+            all_headers_found = False
+            
+            
+            
             while _d:
-                if len(_d) < _buffer_size:
-                    break
-                _d = self.truesock.recv(_buffer_size)
+                if '\n\r\n\r' in headers.lower():
+                    all_headers_found = True
+                
+                if len(_d) < socket_buffer_size:
+                    # It means the socket already read everything
+                    # from the remote server. Because it receives
+                    # less data than the asked size.
+                    # If the response is chunked, we need to check
+                    # for one more line
+                    
+                    if 'transfer-encoding: chunked' in headers.lower():
+                        _d = sock.recv(socket_buffer_size)
+                        self.fd.write(_d)
+                        if not all_headers_found:
+                            headers = headers + _d
+                        if _d == "0\r\n\r\n":
+                            break
+                    else:
+                        break
+                _d = sock.recv(socket_buffer_size)
                 self.fd.write(_d)
+                
+                if not all_headers_found:
+                    headers = headers + _d
 
             self.fd.seek(0)
-            self.truesock.close()
+            sock.close()
 
         def sendall(self, data, *args, **kw):
 
