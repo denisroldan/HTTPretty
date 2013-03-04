@@ -270,30 +270,11 @@ class fakesock(object):
             
             
             while _d:
-                if '\n\r\n\r' in headers.lower():
-                    all_headers_found = True
-                
-                if len(_d) < socket_buffer_size:
-                    # It means the socket already read everything
-                    # from the remote server. Because it receives
-                    # less data than the asked size.
-                    # If the response is chunked, we need to check
-                    # for one more line
-                    
-                    if 'transfer-encoding: chunked' in headers.lower():
-                        _d = sock.recv(socket_buffer_size)
-                        self.fd.write(_d)
-                        if not all_headers_found:
-                            headers = headers + _d
-                        if _d == "0\r\n\r\n":
-                            break
-                    else:
-                        break
                 _d = sock.recv(socket_buffer_size)
                 self.fd.write(_d)
                 
-                if not all_headers_found:
-                    headers = headers + _d
+                if _d == '0\r\n\r\n':
+                    break
 
             self.fd.seek(0)
             sock.close()
