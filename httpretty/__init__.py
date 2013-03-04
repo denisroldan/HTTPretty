@@ -273,7 +273,7 @@ class fakesock(object):
                 _d = sock.recv(socket_buffer_size)
                 self.fd.write(_d)
                 
-                if _d == '0\r\n\r\n':
+                if _d.strip() in ['0', '']:
                     break
 
             self.fd.seek(0)
