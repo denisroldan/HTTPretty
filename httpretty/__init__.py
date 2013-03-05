@@ -85,8 +85,6 @@ old_ssl_wrap_socket = None
 old_sslwrap_simple = None
 old_sslsocket = None
 
-socket_buffer_size = 16
-
 try:
     import socks
     old_socksocket = socks.socksocket
@@ -195,8 +193,7 @@ class fakesock(object):
         def __init__(self, family, type, protocol=6):
             self.setsockopt(family, type, protocol)
             self.truesock = old_socket(family, type, protocol)
-            self._closed = True
-            self.fd = FakeSockFile()
+            self._connected = False
             self.timeout = socket._GLOBAL_DEFAULT_TIMEOUT
             self._sock = self
 
@@ -237,37 +234,28 @@ class fakesock(object):
             self._closed = False
 
         def close(self):
-            if not self._closed:
-                self.truesock.close()
-            self._closed = True
+            self.truesock.close()
+            self._connected = True
 
         def makefile(self, mode='r', bufsize=-1):
-            self._mode = mode
-            self._bufsize = bufsize
-
             if self._entry:
-                self.fd = FakeSockFile()
-                self._entry.fill_filekind(self.fd)
-
-            return self.fd
+                fd = FakeSockFile()
+                self._entry.fill_filekind(fd)
+                return fd
+            else:
+                return self.truesock.makefile(mode, bufsize)
 
         def _true_sendall(self, data, *args, **kw):
-            
-            sock = self.truesock
-            if self._address[1] == 443 and ssl:
-                sock = old_sslsocket(sock)
-                
-            sock.connect(self._address)
-            sock.sendall(data, *args, **kw)
-            
-            self.fd = sock.makefile()
+            if not self._connected:
+                if self._address[1] ==  443 and ssl:
+                    self.truesock = old_sslsocket(self.truesock)
+                self.truesock.connect(self._address)
+                self._connected = True
+            return self.truesock.sendall(data, *args, **kw)
 
         def sendall(self, data, *args, **kw):
-
             self._sent_data.append(data)
             hostnames = [getattr(i.info, 'hostname', None) for i in HTTPretty._entries.keys()]
-            self.fd = FakeSockFile()
-            self.fd.seek(0)
             try:
                 requestline, _ = data.split(b'\r\n', 1)
                 method, path, version = parse_requestline(requestline)
@@ -313,6 +301,9 @@ class fakesock(object):
                 return
 
             self._entry = matcher.get_next_entry(method)
+            
+        def recv(self, *args, **kwargs):
+            return self.truesock.recv(*args, **kwargs)
 
         def debug(*a, **kw):
             frame = inspect.stack()[0][0]
@@ -330,7 +321,7 @@ class fakesock(object):
         def settimeout(self, new_timeout):
             self.timeout = new_timeout
 
-        sendto = send = recvfrom_into = recv_into = recvfrom = recv = debug
+        sendto = send = recvfrom_into = recv_into = recvfrom = debug
 
 
 def fake_wrap_socket(s, *args, **kw):
