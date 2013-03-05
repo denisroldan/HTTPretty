@@ -246,6 +246,7 @@ class fakesock(object):
             self._bufsize = bufsize
 
             if self._entry:
+                self.fd = FakeSockFile()
                 self._entry.fill_filekind(self.fd)
 
             return self.fd
@@ -259,30 +260,13 @@ class fakesock(object):
             sock.connect(self._address)
             sock.sendall(data, *args, **kw)
             
-            _d = sock.recv(socket_buffer_size)
-            headers = ''
-            
-            self.fd.seek(0)
-            self.fd.write(_d)
-            headers = headers + _d
-            all_headers_found = False
-            
-            
-            
-            while _d:
-                _d = sock.recv(socket_buffer_size)
-                self.fd.write(_d)
-                
-                if _d.strip() in ['0', '']:
-                    break
-
-            self.fd.seek(0)
-            sock.close()
+            self.fd = sock.makefile()
 
         def sendall(self, data, *args, **kw):
 
             self._sent_data.append(data)
             hostnames = [getattr(i.info, 'hostname', None) for i in HTTPretty._entries.keys()]
+            self.fd = FakeSockFile()
             self.fd.seek(0)
             try:
                 requestline, _ = data.split(b'\r\n', 1)
