@@ -240,7 +240,7 @@ class fakesock(object):
         def makefile(self, mode='r', bufsize=-1):
             if self._entry:
                 fd = FakeSockFile()
-                self._entry.fill_filekind(fd)
+                self._entry.fill_filekind(fd, sent_data=self._sent_data)
                 return fd
             else:
                 return self.truesock.makefile(mode, bufsize)
@@ -447,7 +447,7 @@ class Entry(Py3kObject):
             self.body = body
 
         self.streaming = streaming
-        if not streaming:
+        if not streaming and isinstance(self.body, basestring):
             self.body_length = len(self.body or '')
         else:
             self.body_length = 0
@@ -500,7 +500,7 @@ class Entry(Py3kObject):
 
         return new
 
-    def fill_filekind(self, fk):
+    def fill_filekind(self, fk, sent_data):
         now = datetime.utcnow()
 
         headers = {
@@ -509,6 +509,17 @@ class Entry(Py3kObject):
             'server': 'Python/HTTPretty',
             'connection': 'close',
         }
+        
+        if callable(self.body):
+            _resp = self.body(sent_data)
+            if not isinstance(_resp, basestring) and len(_resp) == 2:
+                body = _resp[0]
+                headers['content_type'] = _resp[1]
+            else:
+                body = _resp
+            self.body_length = len(body)
+        else:
+            body = self.body
 
         if self.forcing_headers:
             headers = self.forcing_headers
@@ -549,11 +560,11 @@ class Entry(Py3kObject):
         fk.write(b'\r\n')
 
         if self.streaming:
-            self.body, body = itertools.tee(self.body)
-            for chunk in body:
+            body, b = itertools.tee(body)
+            for chunk in b:
                 fk.write(utf8(chunk))
         else:
-            fk.write(utf8(self.body))
+            fk.write(utf8(body))
 
         fk.seek(0)
 
