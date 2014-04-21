@@ -514,7 +514,7 @@ class Entry(Py3kObject):
             _resp = self.body(sent_data)
             if not isinstance(_resp, basestring) and len(_resp) == 2:
                 body = _resp[0]
-                headers['content_type'] = _resp[1]
+                headers.update(_resp[1])
             else:
                 body = _resp
             self.body_length = len(body)
