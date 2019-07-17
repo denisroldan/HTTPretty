@@ -1,7 +1,7 @@
 # #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # <HTTPretty - HTTP client mock for Python>
-# Copyright (C) <2011-2018>  Gabriel Falcão <gabriel@nacaolivre.org>
+# Copyright (C) <2011-2018>  Gabriel Falcao <gabriel@nacaolivre.org>
 #
 # Permission is hereby granted, free of charge, to any person
 # obtaining a copy of this software and associated documentation
@@ -23,3 +23,26 @@
 # WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
+from __future__ import unicode_literals
+
+from .compat import (
+    binary_type, text_type
+)
+
+
+def utf8(s):
+    if isinstance(s, text_type):
+        s = s.encode('utf-8')
+    elif s is None:
+        return binary_type()
+
+    return binary_type(s)
+
+
+def decode_utf8(s):
+    if isinstance(s, binary_type):
+        s = s.decode("utf-8")
+    elif s is None:
+        return text_type()
+
+    return text_type(s)

@@ -1,7 +1,7 @@
 # #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # <HTTPretty - HTTP client mock for Python>
-# Copyright (C) <2011-2013>  Gabriel Falcão <gabriel@nacaolivre.org>
+# Copyright (C) <2011-2018>  Gabriel Falcao <gabriel@nacaolivre.org>
 #
 # Permission is hereby granted, free of charge, to any person
 # obtaining a copy of this software and associated documentation
@@ -23,11 +23,12 @@
 # WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
+# flake8: noqa
 from __future__ import unicode_literals
 
-version = '0.5.10'
 
 import re
+import io
 import inspect
 import socket
 import functools
@@ -38,42 +39,60 @@ import sys
 import traceback
 import types
 
-PY3 = sys.version_info[0] == 3
-if PY3:
-    text_type = str
-    byte_type = bytes
-    import io
-    StringIO = io.BytesIO
-
-    class Py3kObject(object):
-        def __repr__(self):
-            return self.__str__()
-else:
-    text_type = unicode
-    byte_type = str
-    import StringIO
-    StringIO = StringIO.StringIO
-
-
-class Py3kObject(object):
-    def __repr__(self):
-        ret = self.__str__()
-        if PY3:
-            return ret
-        else:
-            ret.encode('utf-8')
+from . import core
+from .errors import HTTPrettyError, UnmockedError
+from .version import version
 
 from datetime import datetime
 from datetime import timedelta
-try:
-    from urllib.parse import urlsplit, parse_qs
-except ImportError:
-    from urlparse import urlsplit, parse_qs
+from urllib.parse import urlsplit, parse_qs
+from http.server import BaseHTTPRequestHandler
 
 try:
-    from http.server import BaseHTTPRequestHandler
+    import socks
+    old_socksocket = socks.socksocket
 except ImportError:
-    from BaseHTTPServer import BaseHTTPRequestHandler
+    socks = None
+
+try:
+    import ssl
+    old_ssl_wrap_socket = ssl.wrap_socket
+    old_sslsocket = ssl.SSLSocket
+except ImportError:
+    ssl = None
+
+__version__ = version
+
+# aliases
+EmptyRequestHeaders = core.EmptyRequestHeaders
+Entry = core.Entry
+HTTPrettyRequestEmpty = core.HTTPrettyRequestEmpty
+URIInfo = core.URIInfo
+URIMatcher = core.URIMatcher
+httprettified = core.httprettified
+httprettized = core.httprettized
+httpretty = core.httpretty
+
+HTTPretty = httpretty
+activate = httprettified
+
+enabled = httprettized
+
+enable = httpretty.enable
+register_uri = httpretty.register_uri
+disable = httpretty.disable
+is_enabled = httpretty.is_enabled
+reset = httpretty.reset
+Response = httpretty.Response
+
+GET = httpretty.GET
+PUT = httpretty.PUT
+POST = httpretty.POST
+DELETE = httpretty.DELETE
+HEAD = httpretty.HEAD
+PATCH = httpretty.PATCH
+OPTIONS = httpretty.OPTIONS
+CONNECT = httpretty.CONNECT
 
 old_socket = socket.socket
 old_create_connection = socket.create_connection
@@ -85,38 +104,22 @@ old_ssl_wrap_socket = None
 old_sslwrap_simple = None
 old_sslsocket = None
 
-try:
-    import socks
-    old_socksocket = socks.socksocket
-except ImportError:
-    socks = None
-
-try:
-    import ssl
-    old_ssl_wrap_socket = ssl.wrap_socket
-    if not PY3:
-        old_sslwrap_simple = ssl.sslwrap_simple
-    old_sslsocket = ssl.SSLSocket
-except ImportError:
-    ssl = None
-
-
 class HTTPrettyError(Exception):
     pass
 
 
 def utf8(s):
-    if isinstance(s, text_type):
+    if isinstance(s, str):
         s = s.encode('utf-8')
 
-    return byte_type(s)
+    return bytes(s)
 
 
 def decode_utf8(s):
-    if isinstance(s, byte_type):
+    if isinstance(s, bytes):
         s = s.decode("utf-8")
 
-    return text_type(s)
+    return str(s)
 
 
 def parse_requestline(s):
@@ -140,13 +143,13 @@ def parse_requestline(s):
         raise ValueError('Not a Request-Line')
 
 
-class HTTPrettyRequest(BaseHTTPRequestHandler, Py3kObject):
+class HTTPrettyRequest(BaseHTTPRequestHandler):
     def __init__(self, headers, body=''):
         self.body = utf8(body)
         self.raw_headers = utf8(headers)
         self.client_address = ['10.0.0.1']
-        self.rfile = StringIO(b'\r\n\r\n'.join([headers.strip(), body]))
-        self.wfile = StringIO()
+        self.rfile = io.BytesIO(b'\r\n\r\n'.join([headers.strip(), body]))
+        self.wfile = io.BytesIO()
         self.raw_requestline = self.rfile.readline()
         self.error_code = self.error_message = None
         self.parse_request()
@@ -159,6 +162,9 @@ class HTTPrettyRequest(BaseHTTPRequestHandler, Py3kObject):
             self.body,
         )
 
+    def __repr__(self):
+        return self.__str__()
+
 
 class EmptyRequestHeaders(dict):
     pass
@@ -169,7 +175,7 @@ class HTTPrettyRequestEmpty(object):
     headers = EmptyRequestHeaders()
 
 
-class FakeSockFile(StringIO):
+class FakeSockFile(io.BytesIO):
     pass
 
 
@@ -430,7 +436,11 @@ STATUSES = {
 }
 
 
-class Entry(Py3kObject):
+class Entry:
+
+    def __repr__(self):
+        return self.__str__()
+
     def __init__(self, method, uri, body,
                  adding_headers=None,
                  forcing_headers=None,
@@ -447,7 +457,7 @@ class Entry(Py3kObject):
             self.body = body
 
         self.streaming = streaming
-        if not streaming and isinstance(self.body, basestring):
+        if not streaming and isinstance(self.body, str):
             self.body_length = len(self.body or '')
         else:
             self.body_length = 0
@@ -512,7 +522,7 @@ class Entry(Py3kObject):
         
         if callable(self.body):
             _resp = self.body(sent_data)
-            if not isinstance(_resp, basestring) and len(_resp) == 2:
+            if not isinstance(_resp, str) and len(_resp) == 2:
                 body = _resp[0]
                 headers.update(_resp[1])
             else:
@@ -569,7 +579,7 @@ class Entry(Py3kObject):
         fk.seek(0)
 
 
-class URIInfo(Py3kObject):
+class URIInfo:
     def __init__(self,
                  username='',
                  password='',
@@ -610,7 +620,10 @@ class URIInfo(Py3kObject):
         return r'<httpretty.URIInfo(%s)>' % fmt
 
     def __hash__(self):
-        return hash(text_type(self))
+        return hash(str(self))
+
+    def __repr__(self):
+        return self.__str__()
 
     def __eq__(self, other):
         self_tuple = (self.port, decode_utf8(self.hostname), decode_utf8(self.path))
@@ -674,7 +687,7 @@ class URIMatcher(object):
     def __str__(self):
         wrap = 'URLMatcher({0})'
         if self.info:
-            return wrap.format(text_type(self.info))
+            return wrap.format(str(self.info))
         else:
             return wrap.format(self.regex.pattern)
 
@@ -701,13 +714,13 @@ class URIMatcher(object):
         return entry
 
     def __hash__(self):
-        return hash(text_type(self))
+        return hash(str(self))
 
     def __eq__(self, other):
-        return text_type(self) == text_type(other)
+        return str(self) == str(other)
 
 
-class HTTPretty(Py3kObject):
+class HTTPretty:
     u"""The URI registration class"""
     _entries = {}
     latest_requests = []
@@ -768,6 +781,9 @@ class HTTPretty(Py3kObject):
     def __str__(self):
         return u'<HTTPretty with %d URI entries>' % len(self._entries)
 
+    def __repr__(self):
+        return self.__str__()
+
     @classmethod
     def Response(cls, body, method=None, uri=None, adding_headers=None, forcing_headers=None,
                  status=200, streaming=False, **headers):
@@ -811,10 +827,6 @@ class HTTPretty(Py3kObject):
             ssl.__dict__['wrap_socket'] = old_ssl_wrap_socket
             ssl.__dict__['SSLSocket'] = old_sslsocket
 
-            if not PY3:
-                ssl.sslwrap_simple = old_sslwrap_simple
-                ssl.__dict__['sslwrap_simple'] = old_sslwrap_simple
-
     @classmethod
     def enable(cls):
         socket.socket = fakesock.socket
@@ -848,10 +860,6 @@ class HTTPretty(Py3kObject):
             ssl.__dict__['wrap_socket'] = fake_wrap_socket
             ssl.__dict__['SSLSocket'] = FakeSSLSocket
 
-            if not PY3:
-                ssl.sslwrap_simple = fake_wrap_socket
-                ssl.__dict__['sslwrap_simple'] = fake_wrap_socket
-
 
 def httprettified(test):
     "A decorator tests that use HTTPretty"
@@ -864,3 +872,22 @@ def httprettified(test):
         finally:
             HTTPretty.disable()
     return wrapper
+
+
+def last_request():
+    """
+    :returns: the last :py:class:`~httpretty.core.HTTPrettyRequest`
+    """
+    return httpretty.last_request
+
+
+def latest_requests():
+    """returns the history of made requests"""
+    return httpretty.latest_requests
+
+
+def has_request():
+    """
+    :returns: bool - whether any request has been made
+    """
+    return not isinstance(httpretty.last_request.headers, EmptyRequestHeaders)

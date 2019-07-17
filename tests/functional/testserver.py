@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 #
 # <HTTPretty - HTTP client mock for Python>
-# Copyright (C) <2011-2013>  Gabriel Falcão <gabriel@nacaolivre.org>
+# Copyright (C) <2011-2018>  Gabriel Falcão <gabriel@nacaolivre.org>
 #
 # Permission is hereby granted, free of charge, to any person
 # obtaining a copy of this software and associated documentation
@@ -27,20 +27,29 @@
 from __future__ import unicode_literals
 
 import os
-
-try:
-    import io
-    StringIO = io.StringIO
-except ImportError:
-    import StringIO
-    StringIO = StringIO.StringIO
-
 import time
+import socket
+
 from tornado.web import Application
 from tornado.web import RequestHandler
 from tornado.httpserver import HTTPServer
 from tornado.ioloop import IOLoop
+from httpretty import HTTPretty
+from httpretty.core import old_socket as true_socket
+# from httpretty.compat import PY3
+from httpretty.compat import binary_type
+from httpretty.compat import text_type
 from multiprocessing import Process
+
+
+def utf8(s):
+    if isinstance(s, text_type):
+        s = s.encode('utf-8')
+
+    return binary_type(s)
+
+# if not PY3:
+#     bytes = lambda s, *args: str(s)
 
 
 class BubblesHandler(RequestHandler):
@@ -53,7 +62,7 @@ class ComeHandler(RequestHandler):
         self.write("<- HELLO WORLD ->")
 
 
-class Server(object):
+class TornadoServer(object):
     is_running = False
 
     def __init__(self, port):
@@ -71,7 +80,10 @@ class Server(object):
         def go(app, port, data={}):
             from httpretty import HTTPretty
             HTTPretty.disable()
+
             http = HTTPServer(app)
+            HTTPretty.disable()
+
             http.listen(int(port))
             IOLoop.instance().start()
 
@@ -79,9 +91,10 @@ class Server(object):
 
         data = {}
         args = (app, self.port, data)
+        HTTPretty.disable()
         self.process = Process(target=go, args=args)
         self.process.start()
-        time.sleep(0.4)
+        time.sleep(1)
 
     def stop(self):
         try:
@@ -90,3 +103,62 @@ class Server(object):
             self.process.terminate()
         finally:
             self.is_running = False
+
+
+class TCPServer(object):
+    def __init__(self, port):
+        self.port = int(port)
+
+    def start(self):
+        HTTPretty.disable()
+
+        def go(port):
+            from httpretty import HTTPretty
+            HTTPretty.disable()
+            import socket
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.bind(('localhost', port))
+            s.listen(True)
+            conn, addr = s.accept()
+
+            while True:
+                data = conn.recv(1024)
+                conn.send(b"RECEIVED: " + bytes(data))
+
+            conn.close()
+
+        args = [self.port]
+        self.process = Process(target=go, args=args)
+        self.process.start()
+        time.sleep(1)
+
+    def stop(self):
+        try:
+            os.kill(self.process.pid, 9)
+        except OSError:
+            self.process.terminate()
+        finally:
+            self.is_running = False
+
+
+class TCPClient(object):
+    def __init__(self, port):
+        self.port = int(port)
+        self.sock = true_socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.sock.connect(('localhost', self.port))
+
+    def send(self, data):
+        if isinstance(data, text_type):
+            data = data.encode('utf-8')
+
+        self.sock.sendall(data)
+        return self.sock.recv(len(data) + 11)
+
+    def close(self):
+        try:
+            self.sock.close()
+        except socket.error:
+            pass  # already closed
+
+    def __del__(self):
+        self.close()

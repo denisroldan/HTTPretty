@@ -1,35 +1,68 @@
-all: check_dependencies unit functional doctests
+# Config
+OSNAME			:= $(shell uname)
 
-filename=httpretty-`python -c 'import httpretty;print httpretty.version'`.tar.gz
+ifeq ($(OSNAME), Linux)
+OPEN_COMMAND		:= gnome-open
+else
+OPEN_COMMAND		:= open
+endif
 
-export HTTPRETTY_DEPENDENCIES:= nose sure
-export PYTHONPATH:= ${PWD}
 
-check_dependencies:
-	@echo "Checking for dependencies to run tests ..."
-	@for dependency in `echo $$HTTPRETTY_DEPENDENCIES`; do \
-		python -c "import $$dependency" 2>/dev/null || (echo "You must install $$dependency in order to run httpretty's tests" && exit 3) ; \
-		done
+all: lint unit functional docs
 
-test: unit functional doctests
+export PYTHONPATH		:= ${PWD}
+export PYTHONASYNCIODEBUG	:=1
+
+dependencies:
+	@pip install -U pip
+	@pip install pipenv
+	@pipenv install --dev --skip-lock
+
+test: lint unit functional pyopenssl
+
+lint:
+	@echo "Checking code style ..."
+	@pipenv run flake8 --show-source httpretty tests
 
 unit:
 	@echo "Running unit tests ..."
-	@nosetests -s --verbosity=2 --with-coverage --cover-erase --cover-inclusive tests/unit --cover-package=httpretty
+	@pipenv run nosetests --cover-erase tests/$@
 
 functional:
 	@echo "Running functional tests ..."
-	@nosetests -s --verbosity=2 --with-coverage --cover-erase --cover-inclusive tests/functional --cover-package=httpretty
+	@pipenv run nosetests tests/$@
 
-doctests:
-	@echo "Running documentation tests tests ..."
-	@steadymark README.md
+pyopenssl:
+	@echo "Running PyOpenSSL mocking tests ..."
+	@pipenv install --skip-lock ndg-httpsclient
+	@pipenv run nosetests --rednose -x --with-coverage --cover-package=httpretty -s tests/pyopenssl
 
 clean:
 	@printf "Cleaning up files that are already in .gitignore... "
 	@for pattern in `cat .gitignore`; do rm -rf $$pattern; done
 	@echo "OK!"
+	@printf "Deleting built documentation"
+	@rm -rf docs/build
+	@printf "Deleting dist files"
+	@rm -rf dist
 
-release: clean unit functional
-	@echo "Releasing httpretty..."
-	@python setup.py sdist register upload
+release: lint unit functional docs
+	@rm -rf dist/*
+	@make rogue-release
+
+rogue-release:
+	@./.release
+	@make pypi
+
+pypi:
+	@pipenv run python setup.py build sdist
+	@pipenv run twine upload dist/*.tar.gz
+
+docs:
+	@cd docs && make html
+	$(OPEN_COMMAND) docs/build/html/index.html
+
+
+
+
+.PHONY: docs lint pypi  clean pyopenssl unit functional test dependencies all

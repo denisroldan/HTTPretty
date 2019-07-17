@@ -1,5 +1,6 @@
 # #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+
 # <HTTPretty - HTTP client mock for Python>
 # Copyright (C) <2011-2018>  Gabriel Falcão <gabriel@nacaolivre.org>
 #
@@ -23,3 +24,22 @@
 # WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
+from __future__ import unicode_literals
+
+import requests
+
+from httpretty import HTTPretty, httprettified
+from sure import expect
+
+
+@httprettified
+def test_httpretty_overrides_when_pyopenssl_installed():
+    ('HTTPretty should remove PyOpenSSLs urllib3 mock if it is installed')
+    # And HTTPretty works successfully
+    HTTPretty.register_uri(HTTPretty.GET, "https://yipit.com/",
+                           body="Find the best daily deals")
+
+    response = requests.get('https://yipit.com')
+    expect(response.text).to.equal('Find the best daily deals')
+    expect(HTTPretty.last_request.method).to.equal('GET')
+    expect(HTTPretty.last_request.path).to.equal('/')

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # <HTTPretty - HTTP client mock for Python>
-# Copyright (C) <2011>  Gabriel Falcão <gabriel@nacaolivre.org>
+# Copyright (C) <2011-2018>  Gabriel Falcao <gabriel@nacaolivre.org>
 #
 # Permission is hereby granted, free of charge, to any person
 # obtaining a copy of this software and associated documentation
@@ -24,38 +24,51 @@
 # WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-
-
+import io
 import os
-from httpretty import version, HTTPretty
-from setuptools import setup
-
-HTTPretty.disable()
+from setuptools import setup, find_packages
 
 
-def get_packages():
-    # setuptools can't do the job :(
-    packages = []
-    for root, dirnames, filenames in os.walk('httpretty'):
-        if '__init__.py' in filenames:
-            packages.append(".".join(os.path.split(root)).strip("."))
-
-    return packages
+def read_version():
+    ctx = {}
+    exec(local_file('httpretty', 'version.py'), ctx)
+    return ctx['version']
 
 
-def test_packages():
-    test_reqs = os.path.join(os.getcwd(), 'requirements.pip')
-    tests_require = [
-            line.strip() for line in open(test_reqs).readlines()
-            if not line.startswith("#")
-        ]
+local_file = lambda *f: \
+    io.open(
+        os.path.join(os.path.dirname(__file__), *f), encoding='utf-8').read()
 
-setup(name='httpretty',
-    version=version,
+
+install_requires = ['six']
+tests_requires = ['nose', 'sure', 'coverage', 'mock', 'rednose']
+
+
+setup(
+    name='httpretty',
+    version=read_version(),
     description='HTTP client mock for Python',
-    author=u'Gabriel Falcao',
+    long_description=local_file('README.rst'),
+    author='Gabriel Falcao',
     author_email='gabriel@nacaolivre.org',
-    url='http://github.com/gabrielfalcao/httpretty',
-    packages=get_packages(),
-    tests_require=test_packages()
+    url='https://httpretty.readthedocs.io',
+    zip_safe=False,
+    packages=find_packages(exclude=['*tests*']),
+    tests_require=tests_requires,
+    install_requires=install_requires,
+    license='MIT',
+    test_suite='nose.collector',
+    classifiers=[
+        'Development Status :: 5 - Production/Stable',
+        'Intended Audience :: Developers',
+        'License :: OSI Approved :: MIT License',
+        'Programming Language :: Python :: 2',
+        'Programming Language :: Python :: 2.7',
+        'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python',
+        'Topic :: Internet :: WWW/HTTP',
+        'Topic :: Software Development :: Testing'
+    ],
 )

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # <HTTPretty - HTTP client mock for Python>
-# Copyright (C) <2011-2013>  Gabriel Falcão <gabriel@nacaolivre.org>
+# Copyright (C) <2011-2018>  Gabriel Falcão <gabriel@nacaolivre.org>
 #
 # Permission is hereby granted, free of charge, to any person
 # obtaining a copy of this software and associated documentation
@@ -36,12 +36,13 @@ def create_socket(context):
         socket.SOCK_STREAM,
         socket.IPPROTO_TCP,
     )
+    context.sock.is_http = True
 
 
 @httprettified
 @scenario(create_socket)
 def test_httpretty_debugs_socket_send(context):
-    u"HTTPretty should debug socket.send"
+    "HTTPretty should debug socket.send"
 
     expect(context.sock.send).when.called.to.throw(
         RuntimeError,
@@ -52,7 +53,7 @@ def test_httpretty_debugs_socket_send(context):
 @httprettified
 @scenario(create_socket)
 def test_httpretty_debugs_socket_sendto(context):
-    u"HTTPretty should debug socket.sendto"
+    "HTTPretty should debug socket.sendto"
 
     expect(context.sock.sendto).when.called.to.throw(
         RuntimeError,
@@ -63,7 +64,7 @@ def test_httpretty_debugs_socket_sendto(context):
 @httprettified
 @scenario(create_socket)
 def test_httpretty_debugs_socket_recv(context):
-    u"HTTPretty should debug socket.recv"
+    "HTTPretty should debug socket.recv"
 
     expect(context.sock.recv).when.called.to.throw(
         RuntimeError,
@@ -74,7 +75,7 @@ def test_httpretty_debugs_socket_recv(context):
 @httprettified
 @scenario(create_socket)
 def test_httpretty_debugs_socket_recvfrom(context):
-    u"HTTPretty should debug socket.recvfrom"
+    "HTTPretty should debug socket.recvfrom"
 
     expect(context.sock.recvfrom).when.called.to.throw(
         RuntimeError,
@@ -85,7 +86,7 @@ def test_httpretty_debugs_socket_recvfrom(context):
 @httprettified
 @scenario(create_socket)
 def test_httpretty_debugs_socket_recv_into(context):
-    u"HTTPretty should debug socket.recv_into"
+    "HTTPretty should debug socket.recv_into"
 
     expect(context.sock.recv_into).when.called.to.throw(
         RuntimeError,
@@ -96,7 +97,7 @@ def test_httpretty_debugs_socket_recv_into(context):
 @httprettified
 @scenario(create_socket)
 def test_httpretty_debugs_socket_recvfrom_into(context):
-    u"HTTPretty should debug socket.recvfrom_into"
+    "HTTPretty should debug socket.recvfrom_into"
 
     expect(context.sock.recvfrom_into).when.called.to.throw(
         RuntimeError,

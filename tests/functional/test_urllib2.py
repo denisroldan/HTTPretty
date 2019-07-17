@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # <HTTPretty - HTTP client mock for Python>
-# Copyright (C) <2011-2013>  Gabriel Falcão <gabriel@nacaolivre.org>
+# Copyright (C) <2011-2018>  Gabriel Falcão <gabriel@nacaolivre.org>
 #
 # Permission is hereby granted, free of charge, to any person
 # obtaining a copy of this software and associated documentation
@@ -26,6 +26,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 from __future__ import unicode_literals
 
+import re
 try:
     from urllib.request import urlopen
     import urllib.request as urllib2
@@ -33,14 +34,15 @@ except ImportError:
     import urllib2
     urlopen = urllib2.urlopen
 
-from sure import *
-from httpretty import HTTPretty, httprettified, decode_utf8
+from sure import within, microseconds
+from httpretty import HTTPretty, httprettified
+from httpretty.core import decode_utf8
 
 
 @httprettified
 @within(two=microseconds)
 def test_httpretty_should_mock_a_simple_get_with_urllib2_read():
-    u"HTTPretty should mock a simple GET with urllib2.read()"
+    "HTTPretty should mock a simple GET with urllib2.read()"
 
     HTTPretty.register_uri(HTTPretty.GET, "http://yipit.com/",
                            body="Find the best daily deals")
@@ -49,13 +51,13 @@ def test_httpretty_should_mock_a_simple_get_with_urllib2_read():
     got = fd.read()
     fd.close()
 
-    expect(got).to.equal(b'Find the best daily deals')
+    got.should.equal(b'Find the best daily deals')
 
 
 @httprettified
 @within(two=microseconds)
 def test_httpretty_provides_easy_access_to_querystrings(now):
-    u"HTTPretty should provide an easy access to the querystring"
+    "HTTPretty should provide an easy access to the querystring"
 
     HTTPretty.register_uri(HTTPretty.GET, "http://yipit.com/",
                            body="Find the best daily deals")
@@ -64,7 +66,7 @@ def test_httpretty_provides_easy_access_to_querystrings(now):
     fd.read()
     fd.close()
 
-    expect(HTTPretty.last_request.querystring).to.equal({
+    HTTPretty.last_request.querystring.should.equal({
         'foo': ['bar', 'baz'],
         'chuck': ['norris'],
     })
@@ -73,7 +75,7 @@ def test_httpretty_provides_easy_access_to_querystrings(now):
 @httprettified
 @within(two=microseconds)
 def test_httpretty_should_mock_headers_urllib2(now):
-    u"HTTPretty should mock basic headers with urllib2"
+    "HTTPretty should mock basic headers with urllib2"
 
     HTTPretty.register_uri(HTTPretty.GET, "http://github.com/",
                            body="this is supposed to be the response",
@@ -84,8 +86,8 @@ def test_httpretty_should_mock_headers_urllib2(now):
     headers = dict(request.headers)
     request.close()
 
-    expect(request.code).to.equal(201)
-    expect(headers).to.equal({
+    request.code.should.equal(201)
+    headers.should.equal({
         'content-type': 'text/plain; charset=utf-8',
         'connection': 'close',
         'content-length': '35',
@@ -98,7 +100,7 @@ def test_httpretty_should_mock_headers_urllib2(now):
 @httprettified
 @within(two=microseconds)
 def test_httpretty_should_allow_adding_and_overwritting_urllib2(now):
-    u"HTTPretty should allow adding and overwritting headers with urllib2"
+    "HTTPretty should allow adding and overwritting headers with urllib2"
 
     HTTPretty.register_uri(HTTPretty.GET, "http://github.com/",
                            body="this is supposed to be the response",
@@ -112,8 +114,8 @@ def test_httpretty_should_allow_adding_and_overwritting_urllib2(now):
     headers = dict(request.headers)
     request.close()
 
-    expect(request.code).to.equal(200)
-    expect(headers).to.equal({
+    request.code.should.equal(200)
+    headers.should.equal({
         'content-type': 'application/json',
         'connection': 'close',
         'content-length': '27',
@@ -126,44 +128,47 @@ def test_httpretty_should_allow_adding_and_overwritting_urllib2(now):
 @httprettified
 @within(two=microseconds)
 def test_httpretty_should_allow_forcing_headers_urllib2():
-    u"HTTPretty should allow forcing headers with urllib2"
+    "HTTPretty should allow forcing headers with urllib2"
 
     HTTPretty.register_uri(HTTPretty.GET, "http://github.com/",
                            body="this is supposed to be the response",
                            forcing_headers={
                                'Content-Type': 'application/xml',
+                               'Content-Length': '35a',
                            })
 
     request = urlopen('http://github.com')
     headers = dict(request.headers)
     request.close()
 
-    expect(headers).to.equal({
+    headers.should.equal({
         'content-type': 'application/xml',
+        'content-length': '35a',
     })
 
 
 @httprettified
 @within(two=microseconds)
 def test_httpretty_should_allow_adding_and_overwritting_by_kwargs_u2(now):
-    u"HTTPretty should allow adding and overwritting headers by " \
-    "keyword args with urllib2"
+    ("HTTPretty should allow adding and overwritting headers by "
+     "keyword args with urllib2")
 
+    body = "this is supposed to be the response, indeed"
     HTTPretty.register_uri(HTTPretty.GET, "http://github.com/",
-                           body="this is supposed to be the response, indeed",
+                           body=body,
                            server='Apache',
-                           content_length='111111',
+                           content_length=len(body),
                            content_type='application/json')
 
     request = urlopen('http://github.com')
     headers = dict(request.headers)
     request.close()
 
-    expect(request.code).to.equal(200)
-    expect(headers).to.equal({
+    request.code.should.equal(200)
+    headers.should.equal({
         'content-type': 'application/json',
         'connection': 'close',
-        'content-length': '111111',
+        'content-length': str(len(body)),
         'status': '200',
         'server': 'Apache',
         'date': now.strftime('%a, %d %b %Y %H:%M:%S GMT'),
@@ -173,8 +178,8 @@ def test_httpretty_should_allow_adding_and_overwritting_by_kwargs_u2(now):
 @httprettified
 @within(two=microseconds)
 def test_httpretty_should_support_a_list_of_successive_responses_urllib2(now):
-    u"HTTPretty should support adding a list of successive " \
-    "responses with urllib2"
+    ("HTTPretty should support adding a list of successive "
+     "responses with urllib2")
 
     HTTPretty.register_uri(
         HTTPretty.GET, "https://api.yahoo.com/test",
@@ -187,26 +192,26 @@ def test_httpretty_should_support_a_list_of_successive_responses_urllib2(now):
     body1 = request1.read()
     request1.close()
 
-    expect(request1.code).to.equal(201)
-    expect(body1).to.equal(b'first response')
+    request1.code.should.equal(201)
+    body1.should.equal(b'first response')
 
     request2 = urlopen('https://api.yahoo.com/test')
     body2 = request2.read()
     request2.close()
-    expect(request2.code).to.equal(202)
-    expect(body2).to.equal(b'second and last response')
+    request2.code.should.equal(202)
+    body2.should.equal(b'second and last response')
 
     request3 = urlopen('https://api.yahoo.com/test')
     body3 = request3.read()
     request3.close()
-    expect(request3.code).to.equal(202)
-    expect(body3).to.equal(b'second and last response')
+    request3.code.should.equal(202)
+    body3.should.equal(b'second and last response')
 
 
 @httprettified
 @within(two=microseconds)
 def test_can_inspect_last_request(now):
-    u"HTTPretty.last_request is a mimetools.Message request from last match"
+    "HTTPretty.last_request is a mimetools.Message request from last match"
 
     HTTPretty.register_uri(HTTPretty.POST, "http://api.github.com/",
                            body='{"repositories": ["HTTPretty", "lettuce"]}')
@@ -222,20 +227,20 @@ def test_can_inspect_last_request(now):
     got = fd.read()
     fd.close()
 
-    expect(HTTPretty.last_request.method).to.equal('POST')
-    expect(HTTPretty.last_request.body).to.equal(
+    HTTPretty.last_request.method.should.equal('POST')
+    HTTPretty.last_request.body.should.equal(
         b'{"username": "gabrielfalcao"}',
     )
-    expect(HTTPretty.last_request.headers['content-type']).to.equal(
+    HTTPretty.last_request.headers['content-type'].should.equal(
         'text/json',
     )
-    expect(got).to.equal(b'{"repositories": ["HTTPretty", "lettuce"]}')
+    got.should.equal(b'{"repositories": ["HTTPretty", "lettuce"]}')
 
 
 @httprettified
 @within(two=microseconds)
 def test_can_inspect_last_request_with_ssl(now):
-    u"HTTPretty.last_request is recorded even when mocking 'https' (SSL)"
+    "HTTPretty.last_request is recorded even when mocking 'https' (SSL)"
 
     HTTPretty.register_uri(HTTPretty.POST, "https://secure.github.com/",
                            body='{"repositories": ["HTTPretty", "lettuce"]}')
@@ -251,20 +256,20 @@ def test_can_inspect_last_request_with_ssl(now):
     got = fd.read()
     fd.close()
 
-    expect(HTTPretty.last_request.method).to.equal('POST')
-    expect(HTTPretty.last_request.body).to.equal(
+    HTTPretty.last_request.method.should.equal('POST')
+    HTTPretty.last_request.body.should.equal(
         b'{"username": "gabrielfalcao"}',
     )
-    expect(HTTPretty.last_request.headers['content-type']).to.equal(
+    HTTPretty.last_request.headers['content-type'].should.equal(
         'text/json',
     )
-    expect(got).to.equal(b'{"repositories": ["HTTPretty", "lettuce"]}')
+    got.should.equal(b'{"repositories": ["HTTPretty", "lettuce"]}')
 
 
 @httprettified
 @within(two=microseconds)
 def test_httpretty_ignores_querystrings_from_registered_uri():
-    u"HTTPretty should mock a simple GET with urllib2.read()"
+    "HTTPretty should mock a simple GET with urllib2.read()"
 
     HTTPretty.register_uri(HTTPretty.GET, "http://yipit.com/?id=123",
                            body="Find the best daily deals")
@@ -273,19 +278,19 @@ def test_httpretty_ignores_querystrings_from_registered_uri():
     got = fd.read()
     fd.close()
 
-    expect(got).to.equal(b'Find the best daily deals')
-    expect(HTTPretty.last_request.method).to.equal('GET')
-    expect(HTTPretty.last_request.path).to.equal('/?id=123')
+    got.should.equal(b'Find the best daily deals')
+    HTTPretty.last_request.method.should.equal('GET')
+    HTTPretty.last_request.path.should.equal('/?id=123')
 
 
 @httprettified
 @within(two=microseconds)
 def test_callback_response(now):
-    (u"HTTPretty should all a callback function to be set as the body with"
-      " urllib2")
+    ("HTTPretty should all a callback function to be set as the body with"
+     " urllib2")
 
-    def request_callback(method, uri, headers):
-        return "The {0} response from {1}".format(decode_utf8(method), uri)
+    def request_callback(request, uri, headers):
+        return [200, headers, "The {} response from {}".format(decode_utf8(request.method), uri)]
 
     HTTPretty.register_uri(
         HTTPretty.GET, "https://api.yahoo.com/test",
@@ -295,7 +300,7 @@ def test_callback_response(now):
     got = fd.read()
     fd.close()
 
-    expect(got).to.equal(b"The GET response from https://api.yahoo.com/test")
+    got.should.equal(b"The GET response from https://api.yahoo.com/test")
 
     HTTPretty.register_uri(
         HTTPretty.POST, "https://api.yahoo.com/test_post",
@@ -312,16 +317,16 @@ def test_callback_response(now):
     got = fd.read()
     fd.close()
 
-    expect(got).to.equal(b"The POST response from https://api.yahoo.com/test_post")
+    got.should.equal(b"The POST response from https://api.yahoo.com/test_post")
 
 
 @httprettified
 def test_httpretty_should_allow_registering_regexes():
-    u"HTTPretty should allow registering regexes with urllib2"
+    "HTTPretty should allow registering regexes with urllib2"
 
     HTTPretty.register_uri(
         HTTPretty.GET,
-        re.compile("https://api.yipit.com/v1/deal;brand=(?P<brand_name>\w+)"),
+        re.compile(r"https://api.yipit.com/v1/deal;brand=(?P<brand_name>\w+)"),
         body="Found brand",
     )
 
@@ -332,4 +337,4 @@ def test_httpretty_should_allow_registering_regexes():
     got = fd.read()
     fd.close()
 
-    expect(got).to.equal(b"Found brand")
+    got.should.equal(b"Found brand")

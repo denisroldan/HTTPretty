@@ -1,7 +1,8 @@
 # #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+#
 # <HTTPretty - HTTP client mock for Python>
-# Copyright (C) <2011-2018>  Gabriel Falcão <gabriel@nacaolivre.org>
+# Copyright (C) <2011-2018>  Gabriel Falcao <gabriel@nacaolivre.org>
 #
 # Permission is hereby granted, free of charge, to any person
 # obtaining a copy of this software and associated documentation
@@ -23,3 +24,16 @@
 # WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
+from __future__ import unicode_literals
+
+
+class HTTPrettyError(Exception):
+    pass
+
+
+class UnmockedError(HTTPrettyError):
+    def __init__(self):
+        super(UnmockedError, self).__init__(
+            'No mocking was registered, and real connections are '
+            'not allowed (httpretty.allow_net_connect = False).'
+        )

@@ -1,2 +1,8 @@
-include requirements.pip
-
+include COPYING
+include Makefile
+include README.rst
+include requirements.txt
+include tests/functional/fixtures/playback-*.json
+include tox.ini
+recursive-include docs *.*
+recursive-include tests *.py
